@@ -1,0 +1,12 @@
+requests==2.31.0
+beautifulsoup4==4.12.2
+python-docx==0.8.11
+reportlab==4.0.4
+sqlalchemy==2.0.25
+dateparser==1.2.0
+lxml==5.2.1
+tqdm==4.66.2
+urllib3==2.2.1
+pillow==10.3.0
+python-dateutil==2.9.0
+html5lib==1.1
