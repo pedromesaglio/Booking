@@ -1,7 +1,8 @@
+import logging
+import contextlib
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Index
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
-import logging
 
 logger = logging.getLogger(__name__)
 Base = declarative_base()
@@ -27,14 +28,6 @@ class DatabaseManager:
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
     
-    def get_existing_urls(self, urls):
-        with self.session_scope() as session:
-            return [result[0] for result in session.query(Article.url).filter(Article.url.in_(urls)).all()]
-    
-    def save_article(self, article_data):
-        with self.session_scope() as session:
-            # ... (mantener implementación anterior)
-    
     @contextlib.contextmanager
     def session_scope(self):
         session = self.Session()
@@ -48,4 +41,37 @@ class DatabaseManager:
         finally:
             session.close()
     
-    # ... (otros métodos anteriores)
+    def get_all_articles(self):
+        with self.session_scope() as session:
+            return [{
+                'title': art.title,
+                'content': art.content,
+                'url': art.url,
+                'date': art.publish_date.strftime('%Y-%m-%d') if art.publish_date else 'Sin fecha'
+            } for art in session.query(Article).all()]
+    
+    def article_exists(self, url):
+        with self.session_scope() as session:
+            return session.query(Article).filter_by(url=url).count() > 0
+    
+    def save_article(self, article_data):
+        with self.session_scope() as session:
+            try:
+                publish_date = None
+                if article_data.get('date'):
+                    try:
+                        publish_date = datetime.fromisoformat(article_data['date'])
+                    except (TypeError, ValueError):
+                        logger.warning(f"Formato de fecha inválido: {article_data['date']}")
+                
+                article = Article(
+                    title=article_data['title'][:500],
+                    content=article_data['content'],
+                    url=article_data['url'][:2000],
+                    publish_date=publish_date
+                )
+                session.add(article)
+                return article
+            except Exception as e:
+                logger.error(f"Error guardando artículo: {str(e)}")
+                raise
