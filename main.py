@@ -1,68 +1,48 @@
 import argparse
 import logging
-import sys
-from database import DatabaseManager
-from scraper import BlogScraper
-from generators import PDFGenerator
+from database import DBManager
+from scraper import BlogScraper, AnalizadorContenido
+from generators import GeneradorLibro
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 def main():
-    parser = argparse.ArgumentParser(description="📚 Gestor de Contenido - CultivoLoco")
-    subparsers = parser.add_subparsers(dest='command', required=True)
+    parser = argparse.ArgumentParser(description="Sistema de Generación de Libros Témicos")
+    subparsers = parser.add_subparsers(dest='comando', required=True)
     
-    # Comando para scraping
-    scrape_parser = subparsers.add_parser('scrape', help='Extraer artículos del blog')
-    scrape_parser.add_argument("--max-articles", type=int, help="Límite máximo de artículos a extraer")
-    scrape_parser.add_argument("--loglevel", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
+    # Comando para extraer contenido
+    parser_scrape = subparsers.add_parser('scrape', help='Extraer contenido del blog')
+    parser_scrape.add_argument('--max', type=int, default=50, help='Máximo de artículos a extraer')
     
-    # Comando para generación
-    generate_parser = subparsers.add_parser('generate', help='Generar archivo de salida')
-    generate_parser.add_argument("-f", "--format", choices=["pdf", "docx"], required=True)
-    generate_parser.add_argument("-o", "--output", required=True)
-    generate_parser.add_argument("--loglevel", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
+    # Comando para generar libro
+    parser_generate = subparsers.add_parser('generate', help='Generar libro estructurado')
+    parser_generate.add_argument('-o', '--output', required=True, help='Nombre del archivo de salida')
     
     args = parser.parse_args()
     
-    logging.basicConfig(
-        level=args.loglevel,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    logger = logging.getLogger(__name__)
+    db = DBManager()
     
-    db = DatabaseManager()
+    if args.comando == 'scrape':
+        logger.info("Iniciando extracción de artículos...")
+        scraper = BlogScraper(db)
+        scraper.extraer_articulos(args.max)
+        logger.info(f"Extracción completada: {args.max} artículos procesados")
     
-    try:
-        if args.command == 'scrape':
-            scraper = BlogScraper(db)
-            logger.info("🔍 Buscando artículos...")
-            urls = scraper.get_all_article_links(args.max_articles)
-            logger.info(f"✅ Encontrados {len(urls)} URLs")
-            
-            logger.info("⚙️ Procesando contenido...")
-            articles = scraper.extract_articles(urls)
-            logger.info(f"📚 Artículos nuevos guardados: {len(articles)}")
+    elif args.comando == 'generate':
+        logger.info("Analizando estructura del contenido...")
+        articulos = db.obtener_todos()
         
-        elif args.command == 'generate':
-            logger.info("📖 Cargando artículos desde la base de datos...")
-            articles = db.get_all_articles()
-            
-            if not articles:
-                logger.error("❌ No hay artículos en la base de datos")
-                sys.exit(1)
-                
-            logger.info(f"🖨️ Generando {args.format.upper()} con {len(articles)} artículos...")
-            
-            if args.format == 'pdf':
-                generator = PDFGenerator(articles, f"{args.output}.pdf")
-            
-            generator.generate()
-            logger.info(f"🎉 ¡Archivo generado! → {args.output}.{args.format}")
-    
-    except KeyboardInterrupt:
-        logger.error("🚫 Operación cancelada por el usuario")
-        sys.exit(130)
-    except Exception as e:
-        logger.error(f"💥 Error crítico: {str(e)}", exc_info=args.loglevel == "DEBUG")
-        sys.exit(1)
+        analizador = AnalizadorContenido()
+        estructura = analizador.analizar_y_estructurar(articulos)
+        
+        logger.info("Generando libro...")
+        generador = GeneradorLibro(f"{args.output}.pdf")
+        generador.generar(estructura)
+        logger.info(f"Libro generado exitosamente: {args.output}.pdf")
 
 if __name__ == "__main__":
     main()

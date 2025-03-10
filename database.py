@@ -1,69 +1,66 @@
+# --------------- database.py ---------------
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
 import logging
+import contextlib
 
 logger = logging.getLogger(__name__)
 Base = declarative_base()
 
-class Article(Base):
-    __tablename__ = 'articles'
-    
+class Articulo(Base):
+    __tablename__ = 'articulos'
     id = Column(Integer, primary_key=True)
-    title = Column(String(500), nullable=False)
-    content = Column(Text, nullable=False)
+    titulo = Column(String(500), nullable=False)
+    contenido = Column(Text, nullable=False)
     url = Column(String(2000), unique=True, nullable=False)
-    publish_date = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    fecha = Column(DateTime)
+    nivel = Column(String(20))
+    capitulo = Column(String(50))
+    creado_en = Column(DateTime, default=datetime.now)
 
-class DatabaseManager:
-    def __init__(self, db_name='articles.db'):
+class DBManager:
+    def __init__(self, db_name='cultivo.db'):
         self.engine = create_engine(f'sqlite:///{db_name}')
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
     
-    def save_article(self, article_data):
+    @contextlib.contextmanager
+    def session_scope(self):
         session = self.Session()
         try:
-            publish_date = None
-            if article_data.get('date'):
-                try:
-                    publish_date = datetime.fromisoformat(article_data['date'])
-                except (TypeError, ValueError):
-                    logger.warning(f"Formato de fecha inválido: {article_data['date']}")
-            
-            article = Article(
-                title=article_data['title'][:500],
-                content=article_data['content'],
-                url=article_data['url'][:2000],
-                publish_date=publish_date
-            )
-            session.add(article)
+            yield session
             session.commit()
-            return article
         except Exception as e:
             session.rollback()
-            logger.error(f"Error guardando artículo: {str(e)}")
+            logger.error(f"Error de base de datos: {str(e)}")
             raise
         finally:
             session.close()
     
-    def get_all_articles(self):
-        session = self.Session()
-        try:
-            return [{
-                'title': art.title,
-                'content': art.content,
-                'url': art.url,
-                'date': art.publish_date.strftime('%Y-%m-%d') if art.publish_date else 'Sin fecha'
-            } for art in session.query(Article).all()]
-        finally:
-            session.close()
+    def guardar_articulo(self, datos):
+        with self.session_scope() as session:
+            try:
+                articulo = Articulo(
+                    titulo=datos['titulo'][:500],
+                    contenido=datos['contenido'],
+                    url=datos['url'],
+                    fecha=datetime.strptime(datos['fecha'], '%Y-%m-%d') if datos['fecha'] else None,
+                    nivel=datos.get('nivel'),
+                    capitulo=datos.get('capitulo')
+                )
+                session.add(articulo)
+                return articulo
+            except Exception as e:
+                logger.error(f"Error guardando artículo: {str(e)}")
     
-    def article_exists(self, url):
-        session = self.Session()
-        try:
-            return session.query(Article).filter_by(url=url).count() > 0
-        finally:
-            session.close()
+    def obtener_todos(self):
+        with self.session_scope() as session:
+            return [{
+                'id': art.id,
+                'titulo': art.titulo,
+                'contenido': art.contenido,
+                'fecha': art.fecha.strftime('%Y-%m-%d') if art.fecha else '',
+                'nivel': art.nivel,
+                'capitulo': art.capitulo
+            } for art in session.query(Articulo).all()]
