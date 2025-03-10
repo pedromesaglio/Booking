@@ -1,4 +1,3 @@
-# --------------- database.py ---------------
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
@@ -8,19 +7,19 @@ import contextlib
 logger = logging.getLogger(__name__)
 Base = declarative_base()
 
-class Articulo(Base):
-    __tablename__ = 'articulos'
+class Article(Base):
+    __tablename__ = 'articles'
     id = Column(Integer, primary_key=True)
-    titulo = Column(String(500), nullable=False)
-    contenido = Column(Text, nullable=False)
+    title = Column(String(500), nullable=False)
+    content = Column(Text, nullable=False)
     url = Column(String(2000), unique=True, nullable=False)
-    fecha = Column(DateTime)
-    nivel = Column(String(20))
-    capitulo = Column(String(50))
-    creado_en = Column(DateTime, default=datetime.now)
+    date = Column(DateTime)
+    level = Column(String(20))
+    chapter = Column(String(50))
+    created_at = Column(DateTime, default=datetime.now)
 
 class DBManager:
-    def __init__(self, db_name='cultivo.db'):
+    def __init__(self, db_name='cultivation.db'):
         self.engine = create_engine(f'sqlite:///{db_name}')
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
@@ -33,34 +32,33 @@ class DBManager:
             session.commit()
         except Exception as e:
             session.rollback()
-            logger.error(f"Error de base de datos: {str(e)}")
+            logger.error(f"Database error: {str(e)}")
             raise
         finally:
             session.close()
     
-    def guardar_articulo(self, datos):
+    def save_article(self, data):
         with self.session_scope() as session:
             try:
-                articulo = Articulo(
-                    titulo=datos['titulo'][:500],
-                    contenido=datos['contenido'],
-                    url=datos['url'],
-                    fecha=datetime.strptime(datos['fecha'], '%Y-%m-%d') if datos['fecha'] else None,
-                    nivel=datos.get('nivel'),
-                    capitulo=datos.get('capitulo')
+                article = Article(
+                    title=data['title'][:500],
+                    content=data['content'],
+                    url=data['url'],
+                    date=datetime.strptime(data['date'], '%Y-%m-%d') if data['date'] else None,
+                    level=data.get('level'),
+                    chapter=data.get('chapter')
                 )
-                session.add(articulo)
-                return articulo
+                session.add(article)
             except Exception as e:
-                logger.error(f"Error guardando artículo: {str(e)}")
+                logger.error(f"Error saving article: {str(e)}")
     
-    def obtener_todos(self):
+    def get_all(self):
         with self.session_scope() as session:
             return [{
                 'id': art.id,
-                'titulo': art.titulo,
-                'contenido': art.contenido,
-                'fecha': art.fecha.strftime('%Y-%m-%d') if art.fecha else '',
-                'nivel': art.nivel,
-                'capitulo': art.capitulo
-            } for art in session.query(Articulo).all()]
+                'title': art.title,
+                'content': art.content,
+                'date': art.date.strftime('%Y-%m-%d') if art.date else '',
+                'level': art.level,
+                'chapter': art.chapter
+            } for art in session.query(Article).all()]

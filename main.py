@@ -1,8 +1,8 @@
 import argparse
 import logging
 from database import DBManager
-from scraper import BlogScraper, AnalizadorContenido
-from generators import GeneradorLibro
+from scraper import BlogScraper, ContentAnalyzer
+from generators import BookGenerator
 
 logging.basicConfig(
     level=logging.INFO,
@@ -11,38 +11,38 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def main():
-    parser = argparse.ArgumentParser(description="Sistema de Generación de Libros Témicos")
-    subparsers = parser.add_subparsers(dest='comando', required=True)
+    parser = argparse.ArgumentParser(description="Automated Book Generation System")
+    subparsers = parser.add_subparsers(dest='command', required=True)
     
-    # Comando para extraer contenido
-    parser_scrape = subparsers.add_parser('scrape', help='Extraer contenido del blog')
-    parser_scrape.add_argument('--max', type=int, default=50, help='Máximo de artículos a extraer')
+    # Scrape command
+    scrape_parser = subparsers.add_parser('scrape', help='Extract articles from blog')
+    scrape_parser.add_argument('--max', type=int, default=50, help='Maximum articles to extract')
     
-    # Comando para generar libro
-    parser_generate = subparsers.add_parser('generate', help='Generar libro estructurado')
-    parser_generate.add_argument('-o', '--output', required=True, help='Nombre del archivo de salida')
+    # Generate command
+    generate_parser = subparsers.add_parser('generate', help='Generate structured book')
+    generate_parser.add_argument('-o', '--output', required=True, help='Output filename')
     
     args = parser.parse_args()
     
     db = DBManager()
     
-    if args.comando == 'scrape':
-        logger.info("Iniciando extracción de artículos...")
+    if args.command == 'scrape':
+        logger.info("Starting content extraction...")
         scraper = BlogScraper(db)
-        scraper.extraer_articulos(args.max)
-        logger.info(f"Extracción completada: {args.max} artículos procesados")
+        scraper.extract_articles(args.max)
+        logger.info(f"Extraction completed: {args.max} articles processed")
     
-    elif args.comando == 'generate':
-        logger.info("Analizando estructura del contenido...")
-        articulos = db.obtener_todos()
+    elif args.command == 'generate':
+        logger.info("Analyzing content structure...")
+        articles = db.get_all()
         
-        analizador = AnalizadorContenido()
-        estructura = analizador.analizar_y_estructurar(articulos)
+        analyzer = ContentAnalyzer()
+        structure = analyzer.analyze_and_structure(articles)
         
-        logger.info("Generando libro...")
-        generador = GeneradorLibro(f"{args.output}.pdf")
-        generador.generar(estructura)
-        logger.info(f"Libro generado exitosamente: {args.output}.pdf")
+        logger.info("Generating book...")
+        generator = BookGenerator(f"{args.output}.pdf")
+        generator.generate(structure)
+        logger.info(f"Book successfully generated: {args.output}.pdf")
 
 if __name__ == "__main__":
     main()

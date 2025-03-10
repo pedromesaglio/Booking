@@ -1,4 +1,3 @@
-# --------------- scraper.py ---------------
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
@@ -8,7 +7,7 @@ import random
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 import numpy as np
-from config import BASE_URL, SELECTORES, ESTRUCTURA_LIBRO, MAX_PAGES
+from config import BASE_URL, SELECTORS, BOOK_STRUCTURE, MAX_PAGES
 
 logger = logging.getLogger(__name__)
 
@@ -18,78 +17,63 @@ class BlogScraper:
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept-Language": "es-ES,es;q=0.9"
+            "Accept-Language": "en-US,en;q=0.9"
         })
     
-    def extraer_articulos(self, max_articulos=50):
-        try:
-            urls = self._obtener_urls()
-            for url in urls[:max_articulos]:
-                if not self.db.obtener_por_url(url):
-                    articulo = self._procesar_url(url)
-                    if articulo:
-                        self.db.guardar_articulo(articulo)
-                    time.sleep(random.uniform(1, 3))  # Delay entre solicitudes
-        except Exception as e:
-            logger.error(f"Error en extracción principal: {str(e)}")
-            raise
-
-    def _obtener_urls(self):
+    def extract_articles(self, max_articles=50):
+        urls = self._get_urls()
+        for url in urls[:max_articles]:
+            if not self.db.get_by_url(url):
+                article = self._process_url(url)
+                if article:
+                    self.db.save_article(article)
+                time.sleep(random.uniform(1, 3))
+    
+    def _get_urls(self):
         urls = []
         next_url = BASE_URL
-        count = 0
+        page_count = 0
         
-        while count < MAX_PAGES and next_url:
+        while page_count < MAX_PAGES and next_url:
             try:
                 soup = self._get_soup(next_url)
                 if not soup:
                     break
                 
-                # Extraer URLs de artículos
-                contenedores = soup.select(SELECTORES['articulos'])
-                for contenedor in contenedores:
-                    enlace = contenedor.select_one('a[href]')
-                    if enlace:
-                        urls.append(urljoin(next_url, enlace['href']))
+                articles = soup.select(SELECTORS['articles'])
+                for article in articles:
+                    link = article.select_one('a[href]')
+                    if link:
+                        urls.append(urljoin(next_url, link['href']))
                 
-                # Manejar paginación
-                next_btn = soup.select_one(SELECTORES['next_page'])
+                next_btn = soup.select_one(SELECTORS['next_page'])
                 next_url = urljoin(next_url, next_btn['href']) if next_btn else None
-                count += 1
+                page_count += 1
                 
             except Exception as e:
-                logger.error(f"Error obteniendo URLs: {str(e)}")
+                logger.error(f"URL extraction error: {str(e)}")
                 break
         
-        return list(set(urls))  # Eliminar duplicados
+        return list(set(urls))
 
-    def _procesar_url(self, url):
+    def _process_url(self, url):
         try:
             soup = self._get_soup(url)
             if not soup:
                 return None
             
-            # Extraer título
-            titulo_elem = soup.select_one(SELECTORES['titulo'])
-            titulo = titulo_elem.text.strip() if titulo_elem else "Sin título"
-            
-            # Extraer contenido
-            contenido_elem = soup.select_one(SELECTORES['contenido'])
-            contenido = '\n'.join([p.text for p in contenido_elem.find_all('p')]) if contenido_elem else ""
-            
-            # Extraer fecha
-            fecha_elem = soup.select_one(SELECTORES['fecha'])
-            fecha = fecha_elem.get('datetime', '')[:10] if fecha_elem else ""
+            title = soup.select_one(SELECTORS['title']).text.strip() if soup.select_one(SELECTORS['title']) else "Untitled"
+            content = '\n'.join([p.text for p in soup.select(SELECTORS['content'] + ' p')]) if soup.select_one(SELECTORS['content']) else ""
+            date = soup.select_one(SELECTORS['date']).get('datetime', '')[:10] if soup.select_one(SELECTORS['date']) else ""
             
             return {
-                'titulo': titulo,
-                'contenido': contenido,
+                'title': title,
+                'content': content,
                 'url': url,
-                'fecha': fecha
+                'date': date
             }
-            
         except Exception as e:
-            logger.error(f"Error procesando {url}: {str(e)}")
+            logger.error(f"Error processing {url}: {str(e)}")
             return None
 
     def _get_soup(self, url):
@@ -97,78 +81,59 @@ class BlogScraper:
             response = self.session.get(url, timeout=15)
             response.raise_for_status()
             return BeautifulSoup(response.text, 'html.parser')
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error HTTP en {url}: {type(e).__name__}")
-            return None
         except Exception as e:
-            logger.error(f"Error inesperado en {url}: {str(e)}")
+            logger.error(f"HTTP error for {url}: {type(e).__name__}")
             return None
 
-class AnalizadorContenido:
+class ContentAnalyzer:
     def __init__(self):
-        self.vectorizador = TfidfVectorizer(
+        self.vectorizer = TfidfVectorizer(
             max_features=1000,
-            stop_words='spanish',
+            stop_words='english',
             ngram_range=(1, 2)
         )
     
-    def analizar_y_estructurar(self, articulos):
+    def analyze_and_structure(self, articles):
         try:
-            textos = [f"{art['titulo']} {art['contenido']}" for art in articulos]
-            X = self.vectorizador.fit_transform(textos)
+            texts = [f"{art['title']} {art['content']}" for art in articles]
+            X = self.vectorizer.fit_transform(texts)
             
-            n_clusters = len(ESTRUCTURA_LIBRO['capitulos'])
-            kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+            kmeans = KMeans(n_clusters=len(BOOK_STRUCTURE['chapters']), random_state=42)
             clusters = kmeans.fit_predict(X)
             
-            return self._mapear_estructura(clusters, textos, articulos)
+            return self._map_structure(clusters, texts, articles)
         except Exception as e:
-            logger.error(f"Error en análisis de contenido: {str(e)}")
+            logger.error(f"Content analysis error: {str(e)}")
             return {}
 
-    def _mapear_estructura(self, clusters, textos, articulos):
-        estructura = {cap: [] for cap in ESTRUCTURA_LIBRO['capitulos']}
+    def _map_structure(self, clusters, texts, articles):
+        structure = {chap: [] for chap in BOOK_STRUCTURE['chapters']}
+        cluster_terms = self._get_cluster_terms(clusters)
         
-        # Obtener términos más importantes por cluster
-        terminos_por_cluster = {}
+        for idx, (article, cluster_id) in enumerate(zip(articles, clusters)):
+            article['chapter'] = self._map_cluster_to_chapter(cluster_id, cluster_terms)
+            article['level'] = self._determine_level(texts[idx])
+            structure[article['chapter']].append(article)
+        
+        return structure
+
+    def _get_cluster_terms(self, clusters):
+        terms = {}
         for cluster_id in np.unique(clusters):
-            indices = np.where(clusters == cluster_id)[0]
-            terminos = self._obtener_terminos_cluster(cluster_id, indices)
-            terminos_por_cluster[cluster_id] = terminos
-        
-        # Mapear clusters a capítulos
-        mapeo_clusters = self._crear_mapeo_clusters(terminos_por_cluster)
-        
-        # Asignar artículos
-        for idx, (art, cluster_id) in enumerate(zip(articulos, clusters)):
-            capitulo = mapeo_clusters.get(cluster_id, 'suelos')
-            art['capitulo'] = capitulo
-            art['nivel'] = self._determinar_nivel(textos[idx])
-            estructura[capitulo].append(art)
-        
-        return estructura
+            top_indices = np.argsort(self.vectorizer.idf_)[::-1][:10]
+            terms[cluster_id] = [self.vectorizer.get_feature_names_out()[i] for i in top_indices]
+        return terms
 
-    def _obtener_terminos_cluster(self, cluster_id, indices):
-        return [
-            self.vectorizador.get_feature_names_out()[i]
-            for i in np.argsort(self.vectorizador.idf_)[::-1][:10]
-        ]
+    def _map_cluster_to_chapter(self, cluster_id, cluster_terms):
+        for chapter in BOOK_STRUCTURE['chapters']:
+            if any(term in chapter for term in cluster_terms[cluster_id]):
+                return chapter
+        return 'soil'
 
-    def _crear_mapeo_clusters(self, terminos_por_cluster):
-        mapeo = {}
-        for cluster_id, terminos in terminos_por_cluster.items():
-            for capitulo, nombre in ESTRUCTURA_LIBRO['capitulos'].items():
-                if any(palabra in nombre.lower() for palabra in terminos):
-                    mapeo[cluster_id] = capitulo
-                    break
-            else:
-                mapeo[cluster_id] = 'suelos'
-        return mapeo
-
-    def _determinar_nivel(self, texto):
-        longitud = len(texto.split())
-        if longitud < 500:
-            return 'basico'
-        elif longitud < 1000:
-            return 'intermedio'
-        return 'experto'
+    def _determine_level(self, text):
+        word_count = len(text.split())
+        if word_count < 500:
+            return 'basic'
+        elif word_count < 1000:
+            return 'intermediate'
+        return 'expert'

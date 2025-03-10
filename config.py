@@ -1,24 +1,23 @@
-# --------------- config.py ---------------
 BASE_URL = "https://cultivoloco.com.ar/"
-OUTPUT_FILENAME = "libro_estructurado"
+OUTPUT_FILENAME = "structured_book"
 MAX_PAGES = 20
 
-ESTRUCTURA_LIBRO = {
-    "niveles": {
-        "basico": {"icono": "🌱", "desc": "Fundamentos Esenciales", "color": "#2A5D34"},
-        "intermedio": {"icono": "🌿", "desc": "Técnicas Avanzadas", "color": "#5B8F68"},
-        "experto": {"icono": "🌳", "desc": "Métodos Expertos", "color": "#3A7D44"}
+BOOK_STRUCTURE = {
+    "levels": {
+        "basic": {"icon": "🌱", "desc": "Basic Fundamentals", "color": "#2A5D34"},
+        "intermediate": {"icon": "🌿", "desc": "Advanced Techniques", "color": "#5B8F68"},
+        "expert": {"icon": "🌳", "desc": "Expert Methods", "color": "#3A7D44"}
     },
-    "capitulos": {
-        "suelos": "Preparación de Suelos",
-        "siembra": "Métodos de Siembra",
-        "riego": "Sistemas de Riego",
-        "cosecha": "Técnicas de Cosecha"
+    "chapters": {
+        "soil": "Soil Preparation",
+        "sowing": "Sowing Methods",
+        "irrigation": "Irrigation Systems",
+        "harvest": "Harvest Techniques"
     },
-    "estilos_pdf": {
-        "titulo": {"fontName": "Helvetica-Bold", "fontSize": 24, "leading": 28},
-        "subtitulo": {"fontName": "Helvetica", "fontSize": 16, "textColor": "#666666"},
-        "nivel": {"fontSize": 14, "textColor": "#FFFFFF", "backColor": "#2A5D34"}
+    "styles": {
+        "title": {"fontName": "Helvetica-Bold", "fontSize": 24, "leading": 28},
+        "subtitle": {"fontName": "Helvetica", "fontSize": 16, "textColor": "#666666"},
+        "level": {"fontSize": 14, "textColor": "#FFFFFF", "backColor": "#2A5D34"}
     }
 }
 
