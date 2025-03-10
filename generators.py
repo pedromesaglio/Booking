@@ -37,7 +37,7 @@ class PDFGenerator:
                 fontName=cfg["fonts"]["heading"],
                 fontSize=cfg["fonts"]["sizes"]["h1"],
                 textColor=colors.HexColor(cfg["colors"]["primary"]),
-                leading=cfg["fonts"]["sizes"]["h1"] * 1.2,
+                leading=cfg["fonts"]["sizes"]["h1"] * 1.4,  # Aumentado espacio entre líneas
                 spaceAfter=cfg["spacing"]["section"],
                 alignment=0
             ),
@@ -46,6 +46,7 @@ class PDFGenerator:
                 fontName=cfg["fonts"]["heading"],
                 fontSize=cfg["fonts"]["sizes"]["h2"],
                 textColor=colors.HexColor(cfg["colors"]["primary"]),
+                leading=cfg["fonts"]["sizes"]["h2"] * 1.3,  # Aumentado espacio entre líneas
                 spaceAfter=cfg["spacing"]["paragraph"]
             ),
             'meta': ParagraphStyle(
@@ -79,30 +80,21 @@ class PDFGenerator:
         canvas.saveState()
         cfg = PDF_CONFIG
         
-        # Header
-        header_height = 30
-        canvas.setFillColor(colors.HexColor(cfg["colors"]["primary"]))
-        canvas.rect(
-            doc.leftMargin, 
-            A4[1] - doc.topMargin - header_height,
-            A4[0] - doc.leftMargin - doc.rightMargin,
-            header_height,
-            fill=1,
-            stroke=0
-        )
-        
+        # Header simplificado
         if self.logo:
             self.logo.drawOn(
                 canvas,
                 doc.leftMargin + 10*mm,
-                A4[1] - doc.topMargin - header_height + 5*mm
+                A4[1] - doc.topMargin - 15*mm  # Posición ajustada
             )
         
-        # Footer
-        footer_text = f"{cfg['branding']['website']} - Página {canvas.getPageNumber()}"
-        canvas.setFont(cfg["fonts"]["body"], cfg["fonts"]["sizes"]["meta"])
-        canvas.setFillColor(colors.HexColor(cfg["colors"]["secondary"]))
-        canvas.drawCentredString(A4[0]/2, doc.bottomMargin - 10*mm, footer_text)
+        # Footer condicional
+        if cfg["book"]["footer"]["enabled"]:
+            canvas.setFont(cfg["fonts"]["body"], cfg["fonts"]["sizes"]["meta"])
+            canvas.setFillColor(colors.HexColor(cfg["colors"]["secondary"]))
+            footer_text = f"{cfg['book']['footer']['text']}"
+            canvas.drawCentredString(A4[0]/2, 15*mm, footer_text)
+        
         canvas.restoreState()
     
     def generate(self):
@@ -196,8 +188,11 @@ class PDFGenerator:
     def _create_article_elements(self, article, art_num):
         elements = []
         elements.append(Paragraph(article["title"], self.styles['h2']))
-        elements.append(Paragraph(f"Publicado el {article['date']}", self.styles['meta']))
-        elements.append(Spacer(1, 8))
+        
+        # Solo mostrar fecha si existe y es válida
+        if article.get('date') and article['date'] not in ['', 'Sin fecha']:
+            elements.append(Paragraph(f"Publicado el {article['date']}", self.styles['meta']))
+            elements.append(Spacer(1, 8))
         
         if art_num > 1 and art_num % 3 == 0:
             transition = random.choice(self.transitions)
@@ -211,60 +206,4 @@ class PDFGenerator:
         return Table(
             [[""]],
             colWidths=["100%"],
-            style=[('LINEABOVE', (0,0), (-1,-1), 1, colors.HexColor(PDF_CONFIG["colors"]["border"]))]
-)
-
-class DOCXGenerator:
-    def __init__(self, articles: List[Dict], filename: str):
-        self.articles = articles
-        self.filename = filename
-    
-    def generate(self):
-        try:
-            doc = Document()
-            self._setup_styles(doc)
-            self._add_cover_page(doc)
-            
-            for article in self.articles:
-                self._add_article(doc, article)
-                doc.add_page_break()
-            
-            doc.save(self.filename)
-            logger.info(f"DOCX generado: {self.filename}")
-        
-        except Exception as e:
-            logger.error(f"Error generando DOCX: {str(e)}")
-            raise
-    
-    def _setup_styles(self, doc):
-        cfg = PDF_CONFIG
-        styles = doc.styles
-        
-        title_style = styles['Title']
-        title_style.font.name = 'Calibri'
-        title_style.font.size = Pt(cfg["fonts"]["sizes"]["h1"])
-        title_style.font.color.rgb = RGBColor.from_string(cfg["colors"]["primary"][1:])
-        
-        heading_style = styles['Heading1']
-        heading_style.font.name = 'Calibri'
-        heading_style.font.size = Pt(cfg["fonts"]["sizes"]["h2"])
-        heading_style.font.color.rgb = RGBColor.from_string(cfg["colors"]["primary"][1:])
-        
-        body_style = styles['Normal']
-        body_style.font.name = 'Arial'
-        body_style.font.size = Pt(cfg["fonts"]["sizes"]["body"])
-        body_style.font.color.rgb = RGBColor(0, 0, 0)
-    
-    def _add_cover_page(self, doc):
-        if os.path.exists(PDF_CONFIG["branding"]["logo_path"]):
-            doc.add_picture(PDF_CONFIG["branding"]["logo_path"], width=Inches(2))
-        
-        title = doc.add_paragraph(PDF_CONFIG["book"]["title"], style='Title')
-        title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-        doc.add_paragraph(PDF_CONFIG["book"]["subtitle"], style='Intense Quote')
-        doc.add_page_break()
-    
-    def _add_article(self, doc, article):
-        doc.add_heading(article['title'], level=1)
-        doc.add_paragraph(f"Publicado el {article['date']}", style='Intense Quote')
-        doc.add_paragraph(article['content'])
+            style=[('LINEABOVE', (0,0), (-1,-1), 1, colors.HexColor(PDF_CONFIG["colors"]["border"]))])

@@ -44,7 +44,7 @@ PDF_CONFIG = {
             "cover": True,
             "toc": True,
             "chapters": True,
-            "index": True
+            "index": False
         },
         "content": {
             "max_articles_per_chapter": 5,
@@ -53,6 +53,10 @@ PDF_CONFIG = {
                 "Este conocimiento se complementa con...",
                 "Profundicemos ahora en..."
             ]
+        },
+        "footer": {
+            "enabled": True,
+            "text": "CultivoLoco.com.ar"
         }
     }
 }

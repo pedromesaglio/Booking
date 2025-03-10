@@ -3,7 +3,7 @@ import logging
 import sys
 from database import DatabaseManager
 from scraper import BlogScraper
-from generators import PDFGenerator, DOCXGenerator
+from generators import PDFGenerator
 
 def main():
     parser = argparse.ArgumentParser(description="📚 Gestor de Contenido - CultivoLoco")
@@ -53,8 +53,6 @@ def main():
             
             if args.format == 'pdf':
                 generator = PDFGenerator(articles, f"{args.output}.pdf")
-            else:
-                generator = DOCXGenerator(articles, f"{args.output}.docx")
             
             generator.generate()
             logger.info(f"🎉 ¡Archivo generado! → {args.output}.{args.format}")
